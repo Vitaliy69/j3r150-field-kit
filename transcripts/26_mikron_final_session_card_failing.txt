@@ -1,0 +1,13 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+DELETE our (cleanup)                   -> SW 6A82
+cleanup DELETE: 6A82
+...CAP: 592B (...823B)
+INSTALL for load                       -> SW 9000
+IFL: 9000
+LOAD 1/4 (4B)                          -> SW 9000
+LOAD 2/4 (220B)                        -> SW 644F
+LOAD stop: 644F

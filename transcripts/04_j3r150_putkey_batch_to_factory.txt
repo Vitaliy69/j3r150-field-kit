@@ -1,0 +1,8 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE #1                         -> SW 9000
+EXT AUTH                               -> SW 9000
+PUT KEY (...ID ...> SW 9000
+PUT KEY: 9000 | 018BAF478BAF478B
+*** ...kvn 01) ***

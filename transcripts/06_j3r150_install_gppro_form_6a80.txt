@@ -1,0 +1,9 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INITIALIZE UPDATE #1                   -> SW 9000
+EXTERNAL AUTHENTICATE (C-MAC level)    -> SW 9000
+-- secure channel open --
+
+INSTALL install+selectable (GPPro-minimal) -> SW 6A80
+   resp: 

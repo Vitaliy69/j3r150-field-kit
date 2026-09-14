@@ -1,0 +1,6 @@
+sdk/
+tools_gp.jar
+build*/
+*.pyc
+__pycache__/
+.DS_Store

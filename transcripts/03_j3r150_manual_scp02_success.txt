@@ -1,0 +1,15 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                         -> SW 9000
+Host challenge: A56112F64985EA59
+INITIALIZE UPDATE #1               -> SW 9000
+kvn=FF scp=02 X=0007 card_challenge=0007F93B32119950 card_crypto=26501A043521
+S-ENC: 666490F84095D7CD4CD2C0992AF19679
+S-MAC: F9F8046E202E159638DFF95E5A49C92E
+...response ...26 ...key...host_cryptogram: 94C174BA5F430911
+C-MAC          : 143E8213527A3EEB
+EXTERNAL AUTHENTICATE (case-3)     -> SW 9000
+
+========================================================
+SECURE CHANNEL OPEN - ...SCP02 worked
+========================================================

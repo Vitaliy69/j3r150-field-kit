@@ -1,0 +1,5 @@
+connect: 0x0 proto: T=1
+
+======== RUN-4 FINAL (Mikron) ========
+SELECT CollarMAC             SW 0000 | 256B | 000000000000000000000000000000000000000000000000000000000000
+CARD STILL UNRESPONSIVE for applet — card_id works but applet hangs card

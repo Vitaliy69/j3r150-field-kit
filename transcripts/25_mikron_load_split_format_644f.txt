@@ -1,0 +1,11 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+INSTALL for load                       -> SW 9000
+IFL: 9000
+blocks: 5 (1 header 4B + 4 ...≤228B)
+LOAD 1/5 (4B)                          -> SW 9000
+LOAD 2/5 (228B)                        -> SW 644F
+LOAD stop: 644F

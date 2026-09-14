@@ -1,0 +1,11 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+DELETE their package...P2=80, ...2019) -> SW 9000
+DELETE: 9000
+>>> card ...their IoT-package...INSTALL for load                       -> SW 9000
+IFL: 9000
+LOAD 1/4                               -> SW 644F
+LOAD stop: 644F

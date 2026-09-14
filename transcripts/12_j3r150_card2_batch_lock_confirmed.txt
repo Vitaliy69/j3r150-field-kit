@@ -1,0 +1,27 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+== ...1 JCOP IDENTIFY ==
+  IDENTIFY 8B: rc=0x0 len=2 | | SW 6A82
+  IDENTIFY 9B+FF: rc=0x0 len=2 | | SW 6A82
+
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+kvn: 0xff
+EXT AUTH (batch...> SW 9000
+GET STATUS apps (card-2)              -> SW 9000
+apps: E32E4F0CD276000085304A434F9000019F700107C503040000C40BD276000085304A434F9000CC08A00000015100
+INSTALL for load                       -> SW 9000
+LOAD 1/4                               -> SW 9000
+LOAD 2/4                               -> SW 9000
+LOAD 3/4                               -> SW 9000
+LOAD 4/4                               -> SW 9000
+INSTALL for install (...CARD)     -> SW 6985
+
+...6985
+→ ...lock; trying PUT KEY ...PUT KEY ...> SW 9000
+PUT KEY: 9000
+INIT UPDATE v2                         -> SW 9000
+EXT AUTH v2                            -> SW 9000
+EXT AUTH v2: 9000
+INSTALL v2 (...> SW 6985
+INSTALL v2: 6985

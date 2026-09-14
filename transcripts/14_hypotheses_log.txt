@@ -1,0 +1,17 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+channel: 9000
+SET STATUS card=INITIALIZED            -> SW 6A80
+INSTALL-install (...card-INIT)      -> SW 6985
+SET STATUS ISD=INITIALIZED             -> SW 6A86
+INSTALL-install (...ISD-INIT)       -> SW 6985
+DELETE A000000396545300..              -> SW 6985
+INSTALL-install (...DELETE Visa)    -> SW 6985
+...SW INSTALL: 6985
+DELETE seller-app                      -> SW 9000
+DELETE seller: 9000
+INSTALL-install (...DELETE seller)  -> SW 6985
+...INSTALL: 6985

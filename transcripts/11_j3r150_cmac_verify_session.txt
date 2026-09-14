@@ -1,0 +1,21 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+channel open
+DELETE ...> SW 6A88
+DELETE: 6A88
+INSTALL for load                       -> SW 9000
+IFL: 9000
+LOAD: 3 blocks ...≤247B (592B CAP)
+LOAD 1/3                               -> SW 9000
+LOAD 2/3                               -> SW 9000
+LOAD 3/3                               -> SW 9000
+LOAD: ...block...9000
+INSTALL for install                    -> SW 6985
+INSTALL: 6985 (6985=lock, expecting ...Visa-...SELECT applet                          -> SW 6A82
+SELECT: 6A82
+
+...6985 lock) — ...SELECT package AID                     -> SW 6A82
+SELECT pkg: 6A82

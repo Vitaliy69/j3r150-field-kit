@@ -1,0 +1,13 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+DELETE stuck...> SW 6A82
+DELETE: 6A82
+INSTALL for load (MiniApp)             -> SW 9000
+IFL: 9000
+TLV: C481DA → 218B payload, 3B header
+LOAD 1/2 (3B P1=00 P2=00)              -> SW 9000
+LOAD 2/2 (218B P1=80 P2=01)            -> SW 644F
+LOAD stop: 644F

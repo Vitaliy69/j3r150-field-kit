@@ -1,0 +1,16 @@
+T=0 connect: 0x0 proto: 1
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+DELETE                                 -> SW 6A82
+INSTALL for load                       -> SW 9000
+
+IFL: 9000
+LOAD: 4 blocks (smacon-...+ case-4 Le=0x00
+
+LOAD 1/4 (4B Le=00)                    -> SW 9000
+  >>> ...1 ...<<<
+LOAD 2/4 (220B Le=00)                  -> SW 644F
+
+  ...block...2: 644F
+  644F — case-4 (Le) ...Le (case-3):

@@ -1,0 +1,29 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+=== ...===
+LOAD close (empty last-block)         -> SW 6700
+1. LOAD close: 6700
+DELETE CollarMAC P2=00                 -> SW 6A80
+DELETE CollarMAC P2=80                 -> SW 6A80
+DELETE CollarMAC P2=00                 -> SW 6A82
+DELETE MiniApp P2=00                   -> SW 6A80
+DELETE MiniApp P2=80                   -> SW 6A80
+DELETE MiniApp P2=00                   -> SW 6A82
+DELETE ISD-related P2=80               -> SW 6A80
+3. DELETE ISD P2=80: 6A80
+DELETE ISD-related P2=00               -> SW 6A80
+3. DELETE ISD P2=00: 6A80
+GET STATUS apps                        -> SW 9000
+4. apps: 9000 | 08A000000151000000
+GET STATUS load files                  -> SW 9000
+4. load files: 9000 | 
+INSTALL for load (attempt)             -> SW 9000
+5. INSTALL for load: 9000
+   >>> CARD ...LOAD...
+LOAD 1/4 (4B)                          -> SW 9000
+   LOAD 1: 9000
+LOAD 2/4 (220B)                        -> SW 644F
+   LOAD 2: 644F

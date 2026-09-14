@@ -1,0 +1,9 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+DELETE their package...[4F AID][00]          -> SW 6A80
+DELETE their package...[LV AID]              -> SW 6A80
+DELETE their package...[4F AID]              -> SW 6A82
+DELETE: 6A82

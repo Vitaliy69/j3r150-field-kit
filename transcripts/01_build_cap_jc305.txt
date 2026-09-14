@@ -1,0 +1,4 @@
+== RUN-1: build ==
+javac: openjdk@17 17.0.20, --release 7 (v51) — v52/v65 ...SDK: Java Card 3.0.5 Classic (u2), martinpaljak/oracle_javacard_sdks
+Converter [v3.0.5] Copyright (c) 1998-2017 Oracle — 0 errors 0 warnings
+CAP: build/cap/collarmac/javacard/collarmac.cap 5815 bytes

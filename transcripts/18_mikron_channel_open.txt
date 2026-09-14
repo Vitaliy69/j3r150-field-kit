@@ -1,0 +1,18 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+FCI: 6F81838001C4810204648201388302DF018408A0000001510000008A0105C102000C450A000034602C3005044002C5039EFE
+INIT UPDATE #1                         -> SW 9000
+kvn=01 scp=02 | ...response 26B: 000034602C30050440020102000CE1E7377BA8919BAC634BF757
+EXT AUTH (40..4F, case-3)              -> SW 9000
+*** ...card ...key...***
+
+== ...==
+GET STATUS ISD                         -> SW 6A86
+ISD: 6A86
+GET STATUS apps/SD                     -> SW 6A86
+apps/SD: 6A86
+GET STATUS load files                  -> SW 6A86
+load files: 6A86
+GET STATUS modules                     -> SW 6A86
+modules: 6A86

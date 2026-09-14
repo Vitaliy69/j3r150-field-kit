@@ -1,0 +1,13 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+GET STATUS apps (P2=00)                -> SW 9000
+apps: 9000 | 08A0000001510000000F9E06112233445501
+GET STATUS load files (P2=00)          -> SW 9000
+load files: 9000 | 051122334455
+INSTALL for load (Mikron form)         -> SW 9000
+IFL: 9000
+LOAD 1/4                               -> SW 644F
+LOAD: 644F

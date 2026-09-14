@@ -1,0 +1,10 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE                            -> SW 9000
+EXT AUTH                               -> SW 9000
+INSTALL for load (MiniApp)             -> SW 9000
+IFL: 9000
+MiniApp: 220B = 1 block LOAD
+LOAD (single block, P1=80 last)   -> SW 6A80
+LOAD: 6A80

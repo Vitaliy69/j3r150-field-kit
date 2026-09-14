@@ -1,0 +1,8 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INIT UPDATE #1                         -> SW 9000
+EXT AUTH (factory kvn 01)            -> SW 9000
+*** ...kvn=01) ***
+INSTALL-install (GPPro-min)            -> SW 6A80
+INSTALL-install (std)                  -> SW 6A80

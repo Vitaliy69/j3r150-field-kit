@@ -1,0 +1,6 @@
+Reader: Generic EMV Smartcard Reader
+connect: 0x0 proto: 1
+
+======== RUN-4 (Mikron, via card_id stack) ========
+SELECT CollarMAC: SW 0000 | 256B | 00000000000000000000000000000000000000000000000000000000000000000000000000000000
+CARD WEDGED

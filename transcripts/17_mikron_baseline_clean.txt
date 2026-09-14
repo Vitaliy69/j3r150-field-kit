@@ -1,0 +1,23 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+ISD SELECT: 9000
+INIT UPDATE (...> SW 9000
+...9000 | len: 26 | kvn: 0xff | scp: 0x2
+...keys ...kvn-...['batch...']
+EXT AUTH (batch...> SW 9000
+EXT AUTH batch...9000
+GET STATUS apps                        -> SW 9000
+apps: E32E4F0CD276000085304A434F9000019F700107C503040000C40BD276000085304A434F9000CC08A00000015100
+GET STATUS load files                  -> SW 9000
+load files: E31B4F07A00000015153509F700101CE02FFFFCC08A000000151000000E31F4F0BD276000085304A434F90009F700101CE02
+INSTALL for load                       -> SW 9000
+IFL: 9000
+LOAD 1/4                               -> SW 9000
+LOAD 2/4                               -> SW 9000
+LOAD 3/4                               -> SW 9000
+LOAD 4/4                               -> SW 9000
+INSTALL-install (...> SW 6985
+INSTALL-install (GPPro-min)            -> SW 6A80
+INSTALL-install (std)                  -> SW 6A80
+INSTALL: 6A80

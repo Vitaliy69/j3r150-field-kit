@@ -1,0 +1,15 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INITIALIZE UPDATE #1                   -> SW 9000
+EXTERNAL AUTHENTICATE (C-MAC level)    -> SW 9000
+-- secure channel open --
+
+INSTALL for load (5-field)             -> SW 9000
+   CAP 823B -> C4-TLV 827B
+LOAD 1/4 (247B P2=00 last=00)          -> SW 9000
+LOAD 2/4 (247B P2=01 last=00)          -> SW 9000
+LOAD 3/4 (247B P2=02 last=00)          -> SW 9000
+LOAD 4/4 (86B P2=03 last=80)           -> SW 9000
+INSTALL for install+selectable         -> SW 6A80
+INSTALL-install: 6A80
