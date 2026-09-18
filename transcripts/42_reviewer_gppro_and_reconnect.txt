@@ -1,0 +1,58 @@
+Independent reviewer observations
+Curated excerpts from the reviewer's captured logs; not a new hardware run.
+Times below are MSK. Hardware serial was not re-read during these probes.
+
+Environment:
+macOS 26.7 aarch64; Homebrew Java 21.0.12
+Generic EMV Smartcard Reader, USB VID:PID 058F:9540, Apple USB hub
+ATR 3B6A00FF0031C173C84000009000; T=0
+GlobalPlatformPro tools_gp.jar v25.10.20, --debug --mode MAC --list
+Documented batch ENC/MAC/DEK supplied as --key-enc/--key-mac/--key-dek.
+
+Independent GPPro exchange (javax.smartcardio, not Python ctypes):
+>> 00A4040000
+<< 6F108408A000000151000000A5049F6501FF9000   51 ms
+>> 8050000008F0F14BD2DF71B1B600
+<< 00003275152546208707FF0200509ED827E42048FBF891BD4D741CA79000   108 ms
+>> 8482010010AC25E0D220F10BA294A4DC7EC191726300
+<< 6D00   69 ms
+GPPro exit 1: EXTERNAL AUTHENTICATE failed: 0x6D00
+SCardEndTransaction; SCardDisconnect(false).
+
+A following corrected Python connection returned 0x80100066.
+That process sent no APDUs. This is not a controlled case-3 comparison.
+
+Native C / Apple PCSC.framework reconnect experiments:
+The user reseated the card before each experiment.
+Only SELECT ISD and GET RESPONSE were sent; no authentication or persistent
+card changes. SCardGetStatusChange was used for monitoring.
+
+LEAVE:
+21:57:46 connect T=0 success, SELECT 6112, GET RESPONSE 9000;
+SCardDisconnect(LEAVE_CARD) -> 0.
+21:59:47 reconnect -> 0x80100066, 179 ms, protocol 0.
+Elapsed from insertion: 120.6 seconds.
+
+HOLD:
+22:00:57 connect T=0 success, SELECT -> 9000.
+Keep the SAME handle open for 120 seconds, no APDUs during the wait.
+22:02:58 SELECT through that same handle -> 9000.
+SCardDisconnect(LEAVE_CARD) -> 0.
+22:03:12 independent SCardConnect -> 0x80100066 (14 seconds after close).
+
+UNPOWER:
+22:04:18 connect/SELECT -> success.
+SCardDisconnect(UNPOWER_CARD) -> 0.
+22:04:29 reconnect -> 0x80100066, 182 ms.
+Elapsed from insertion: 10.8 seconds.
+
+After failures, the USB reader retained IORegistry id 0x100007e73 and
+sessionID 1215614580508; CurrentPowerState=2.
+PC/SC reported PRESENT and a cached ATR, without MUTE.
+
+Interpretation:
+Reconnection can fail after a successful SELECT-only session.
+An open handle survived the tested two-minute idle period.
+No USB re-enumeration was observed. Card/reader/driver attribution remains open.
+Probe times do not establish an idle timeout.
+No DELETE, LOAD, INSTALL, PERSONALIZE, ROTATE or PUT KEY was run in these checks.

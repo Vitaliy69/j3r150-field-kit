@@ -1,0 +1,80 @@
+THE CLOSED EXPERIMENT: the full key lifecycle on real
+hardware, driven through an INDEPENDENT transport (javax.smartcardio,
+tools/SelTest.java + tools/ApduTest.java - no ctypes involved).
+
+Card #3 (batch PI260905-2133, KVN FF), applet instance F000000001DEAD02
+(CollarMAC CAP, SHA-256 B7922373B27E6D673F838931AC94051F539DBEB36481E0204124D236491AAFB4,
+see transcript 38), installed via the corrected standard GP 2.2.1 INSTALL form.
+
+Session 1 - reachability (SelTest):
+  SELECT F000000001DEAD02          -> SW=9000, 30 ms, empty FCI
+
+Session 2 - the lifecycle (ApduTest):
+  SELECT                          -> SW 9000
+  MAC before personalization
+    80 32 00 00 08 5142434445464748
+                                  -> SW 6985  (refused by design, 13 ms)
+  PERSONALIZE
+    80 40 00 00 20 <DK || CMAC(TK,DK)>
+    DK = 000102030405060708090A0B0C0D0E0F
+    TK = 404142434445464748494A4B4C4D4E4F (factory test key)
+                                  -> SW 9000  (80 ms, EEPROM write)
+  MAC challenge under the new device key
+    80 32 00 00 08 5142434445464748
+                                  -> SW 9000, 16 bytes, 59 ms
+  card response: 7E52D227E20BA4C3EA70A8E5DF2BDA32
+  host-computed CMAC(DK, challenge), independent:
+                                  7E52D227E20BA4C3EA70A8E5DF2BDA32
+  = byte-for-byte match.
+
+Session 3 - the one-shot rule (after card reseat):
+  SELECT                          -> SW 9000
+  second PERSONALIZE (same wrap)  -> SW 6985  (refused - one-shot, by design)
+  MAC challenge                   -> SW 9000, 7E52D227E20BA4C3EA70A8E5DF2BDA32
+  = device key survived the refused re-personalization attempt unchanged.
+
+WHAT THIS CLOSES: the article's open experiment ("on-hardware MAC
+verification remains an open experiment for a card without the lock") is
+closed - successfully. Every behavioral claim about the applet is now
+hardware-proven: pre-perso refusal, one-shot personalization, CMAC under
+the provisioned device key matching host computation, one-shot rule on
+re-personalization.
+
+WHAT THIS REVERSES: the "instantiation lock" never existed (transcript 38);
+the "SELECT hang" was a host ctypes binding defect (fixed in gp_lite:
+8-byte SCARD_IO_REQUEST, 7-arg SCardTransmit, rc checks) - the applet was
+reachable all along through a correct transport.
+
+--- LITERAL CONSOLE OUTPUT (ApduTest, as requested by review) ---
+
+$ java -cp tools SelTest F000000001DEAD02
+terminals: [PC/SC terminal Generic EMV Smartcard Reader]
+protocol: T=0
+send: 00A4040008F000000001DEAD0200
+SW=9000 datalen=0 elapsed_ms=30
+resp: 9000
+
+$ java -cp tools ApduTest F000000001DEAD02 \
+    80320000085142434445464748 \
+    8040000020000102030405060708090A0B0C0D0E0FF3F8F9FF1F19657B18DC28FC42FBAAAD \
+    80320000085142434445464748
+SELECT        SW=9000 resp=9000
+APDU[1] 8032000008514243.. SW=6985 len=0 ms=13 resp=
+APDU[2] 8040000020000102.. SW=9000 len=0 ms=80 resp=
+APDU[3] 8032000008514243.. SW=9000 len=16 ms=59 resp=7E52D227E20BA4C3EA70A8E5DF2BDA32
+
+$ java -cp tools ApduTest F000000001DEAD02 \
+    8040000020000102030405060708090A0B0C0D0E0FF3F8F9FF1F19657B18DC28FC42FBAAAD \
+    80320000085142434445464748          (after card reseat)
+SELECT        SW=9000 resp=9000
+APDU[1] 8040000020000102.. SW=6985 len=0 ms=14 resp=
+APDU[2] 8032000008514243.. SW=9000 len=16 ms=59 resp=7E52D227E20BA4C3EA70A8E5DF2BDA32
+
+HOST-SIDE INDEPENDENT COMPUTATION (python cryptography, CMAC/AES):
+  CMAC(TK, DK)  = F3F8F9FF1F19657B18DC28FC42FBAAAD   (personalization wrap tag)
+  CMAC(DK, CH)  = 7E52D227E20BA4C3EA70A8E5DF2BDA32   (expected MAC; card matched)
+
+NAMING (per review): what is proven on hardware here is personalization and
+USE of the device key. Hardware ROTATION is not yet tested (the rotate-capable
+build with domain separation is the next step); revocation is a backend-side
+operation and is not a card test.

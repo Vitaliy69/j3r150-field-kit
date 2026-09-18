@@ -1,43 +1,63 @@
-# Firmware misbehavior catalog
+# Observations and corrections
 
-Observed on both cards of batch PI260905-2133 (ISD reports SCP02, key version 0xFF). All items reproduced multiple times.
+Keep client failures separate from card behavior. Historical transcripts retain
+their original hypotheses; this file records the current interpretation.
 
-## 1. EXTERNAL AUTHENTICATE rejects the trailing Le byte
+## Confirmed client bugs, corrected
 
-The same command, two formats:
+- A GET RESPONSE assembler stripped SW twice, turning a 28-byte INIT UPDATE
+  payload into 26 bytes. This was not firmware truncation.
+- An incorrect Apple PC/SC binding used the wrong structure size, passed an
+  extra argument, and ignored return codes. A zero-filled receive buffer was
+  mistaken for a SELECT hang.
+- INSTALL used the ISD AID in the instance slot and omitted the token length.
+  The standard encoding succeeded.
+- INSTALL for load also has five standard fields: load-file AID, SD AID,
+  hash, load parameters, Load Token. An empty value still has a length field.
+  There is no extra signature slot between hash and parameters.
 
-- `84 82 01 00 10 <16 bytes> 00` (case-4, Le present) -> 6D00, "Invalid INStruction"
-- `84 82 01 00 10 <16 bytes>` (case-3, no Le) -> processed, reaches the cryptographic check
+The three Python clients now share `scripts/pcsc_mac.py`: Apple ABI types,
+return-code checks, cleanup, and one continuation loop for `61xx`/`6Cxx`.
+Transport errors are reported separately from APDU status words.
 
-Every release of GlobalPlatformPro tested (v25.10.20, v26.06.04, v20.08.12) sends case-4. Therefore no stock tool can open this card, with any keys.
+The historical `probe_extauth.py` also retained the defective binding and
+reused a failed session for dummy-cryptogram variants. It is now an archive
+notice that sends no APDUs. The invalid `install03` wrapping experiment is
+archived as well; neither stage is a working installation recipe.
 
-## 2. Status words lie about available length
+## Case-3 and case-4 EXT AUTH
 
-INITIALIZE UPDATE answers `61 12` (18 bytes promised) or `61 1C` (28 promised) nondeterministically for the same command. GET RESPONSE delivers whatever it likes: sometimes the full 28 bytes, sometimes 26 of them (the card cryptogram arrives truncated by two bytes). Treat SW2 as a hint, not a contract; retry INIT UPDATE with a fresh host challenge until a full-length answer arrives.
+Case-3 succeeded in the working sessions. Independent GPPro v25.10.20,
+javax.smartcardio, macOS 26.7, Generic EMV reader, T=0: case-4 returned `6D00`
+(transcript 42). This is no longer dependent on the old Python binding.
+The cause within the card/reader/driver path is not isolated. Older runs with
+other tool versions are historical observations, not a universal tool verdict.
 
-## 3. Greedy GET RESPONSE is punished
+## Reconnect after a successful session
 
-Requesting more than SW2 promised (for example Le=0xE0) returns 6985, "conditions of use not satisfied". Ask for exactly SW2.
+A SELECT-only native PC/SC experiment reproduced `0x80100066` after disconnect.
+An open handle survived 120 seconds without APDUs. UNPOWER at disconnect did
+not repair reconnect. See [diagnostics](diagnostics.md) and transcript 42.
 
-## 4. Wedges after unhappy sessions
+## SCP02 details
 
-After a failed or half-finished secure-channel sequence the card stops answering until physically reseated. A reseat is a power cycle; no PCSC-level reset recovered it in our tests.
+The working client uses encrypted ICV chaining after EXT AUTH. The previous
+claim that `i=02` mandated encryption was wrong: the ICV-encryption option is
+bit `0x10` in GP 2.2.1 Appendix E.1.1. Do not infer the option from the SCP
+identifier byte in INITIALIZE UPDATE.
 
-## 5. The card challenge is not random
+The repeated challenge values in early traces remain observations to re-test
+with the corrected transport. They do not establish a defective random generator.
 
-Across five sessions with five different host challenges, the card produced three distinct "random" challenges, two of them twice each. Observed values: 0008E0E074A4BCAC, 00055AB524F51185, 00046A7DAECDC988. The GP specification requires an unpredictable challenge; a repeating one undermines the replay protection the handshake exists to provide.
+## Historical GET RESPONSE and SELECT variations
 
-## 6. SELECT moods
+Oversized GET RESPONSE requests and cold-start SELECT variations were logged
+with the old transport. Ask for the announced length and follow `6Cxx`
+corrections; do not attribute those historical errors to firmware without a
+controlled independent reproduction.
 
-Immediately after a cold start the ISD SELECT sometimes answers 6985 or 6C 12 (with a Le hint) instead of the expected 9000 or 61xx. A retry or a reseat settles it. We found no pattern; we found patience works.
+## Registry continuation
 
-## GET STATUS 6310 desyncs a naive C-MAC chain (observed Sep 17)
-
-A sequential registry read (P1 80/40/20, P2=0x02) answered `6310` (more data)
-on the load-files section. The card had executed the command and advanced its
-C-MAC chain, but a client that only advances its ICV on `9000` sends the next
-command with a stale MAC - which surfaces as `6982` on that command. If you
-need the registry mid-session, either implement the `6310` continuation and
-ICV handling properly, or read the registry in a session of its own. In this
-kit the load stage therefore runs the proven DELETE -> INSTALL -> LOAD ->
-INSTALL sequence by default; pass `--registry` to opt into the registry read.
+GET STATUS can answer `6310`: the command was processed, with more registry
+entries available. Continue with the same P1 and P2=`03`, advancing the C-MAC
+chain. The client now collects these pages and stops on an unexpected status.

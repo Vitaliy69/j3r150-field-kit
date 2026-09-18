@@ -1,0 +1,23 @@
+HarnessRotate 18/18 (jCardSim, after domain separation + stale-engine + length fixes)
+applet: sim/CollarMACRotate.java (CTX_MAC=0x01 / CTX_ROTATE=0x02)
+
+PASS  1  MAC before perso       SW=6985
+PASS  2  perso 31B rejected     SW=6700
+PASS  3  perso 33B rejected     SW=6700
+PASS  4  personalize (K1)       SW=9000
+PASS  5  MAC under K1           SW=9000 tag=B547D898956AF64ED4DCEA32987426C1
+PASS  61 MAC len 01          SW=9000 tag=18A93141F1F4DE4F8B59A89210ECF6EE
+PASS  62 MAC len 15          SW=9000 tag=C3AA54177E2838490CBA45EBA390E38B
+PASS  63 MAC len 16          SW=9000 tag=20F1119DBF785E20AE1E8235AC34FEAC
+PASS  64 MAC len 17          SW=9000 tag=B73E7FDD4C6216963AA30BFBB48BC149
+PASS  65 MAC len 31          SW=9000 tag=6E4D6D7D5AADBED9994CFB804A9A872F
+PASS  66 MAC len 32          SW=9000 tag=75DED55237B1EFE41DE9C80E98C7ABCF
+PASS  7  FORGE cross-domain     SW=6982  (old build accepted this!)
+PASS  8  MAC after failed rot   SW=9000  (stale-engine fix)
+PASS  9  rotate BAD wrap        SW=6982
+PASS  10 rotate 31B rejected    SW=6700
+PASS  11 rotate 33B rejected    SW=6700
+PASS  12 rotate good (K1->K2)   SW=9000
+PASS  13 MAC under K2           SW=9000 tag=D2011C73250BF215D3F5F0EB005C38A1
+
+ALL 18 TESTS PASSED

@@ -1,5 +1,5 @@
 Card #1 (factory-derived keyset, INIT UPDATE reports key ID 01 KVN 02),
-session chain on 18.09 after registry cleanup:
+session chain after registry cleanup:
 
 DELETE our package                     -> SW 9000   (debris from earlier experiments)
 INSTALL for load                       -> SW 9000

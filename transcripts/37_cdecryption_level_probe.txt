@@ -1,0 +1,51 @@
+C-DECRYPTION LEVEL PROBE (session preceding the pivot; reconstructed)
+
+PROVENANCE: the raw APDU log of this session was lost before the first
+commit - the file landed in this repository empty. What follows is a
+summary reconstructed from the session notes and the reviewer's index
+line, not a byte-level transcript.
+
+GOAL (as framed at the time):
+Test whether INSTALL was refused because the card demands confidentiality
+we were not providing - i.e. whether the "lock" was a security-level
+requirement rather than anything about the command itself.
+
+WHAT WAS DONE:
+- Manual SCP02 channel (INITIALIZE UPDATE + EXTERNAL AUTHENTICATE) opened
+  with a security level including C-DECRYPTION.
+- INSTALL (for install) attempted with encrypted command data, repeated
+  for the advertised key values (the documented batch transport set and
+  the factory candidates), according to the surviving session summary.
+- The preserved install03 implementation used static KDEK-based wrapping,
+  not the SCP02 Secure Channel encryption session key. Its block wrapping
+  and MAC construction were not a valid SCP02 C-DECRYPTION exchange. The
+  current client archives this probe rather than offering it as an installer.
+
+REPORTED OBSERVATIONS (raw exchanges unavailable):
+- EXT AUTHENTICATE at the C-DECRYPTION level returned 9000: the card
+  ACCEPTED the confidentiality level itself.
+- The encrypted INSTALL returned 6982 (security status not satisfied)
+  with all advertised key values; no key candidate changed the outcome.
+
+READING AT THE TIME:
+"Refusal survives encryption" was logged as further evidence for the
+innate-lock hypothesis: not a key problem, not a confidentiality problem.
+
+READING AFTER TRANSCRIPT 38 (the pivot):
+This probe was inconclusive. The historical client had two independent
+defects: invalid secure messaging and malformed INSTALL data (ISD AID in
+the instance-AID slot, missing token-length byte). The reported 6982 does
+not establish which check rejected the command. Acceptance of the requested
+security level does not validate the encryption of a later command.
+
+This probe therefore did NOT eliminate confidentiality as a possible
+requirement. Transcript 38 later demonstrated successful installation with
+corrected command data at C-MAC level; that successful exchange, rather
+than this invalid encrypted probe, showed that C-DECRYPTION was unnecessary
+for the installation tested there.
+
+Verification sources:
+- Historical client: git show 9af4100:scripts/gp_lite.py, install03 branch.
+- Current client: scripts/gp_lite.py, archived install03 diagnostic.
+- GlobalPlatform Card Specification 2.2.1, Appendix E.4.6: command data
+  encryption uses the Secure Channel encryption session key.

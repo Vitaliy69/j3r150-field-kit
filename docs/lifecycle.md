@@ -1,79 +1,60 @@
-# One key's whole life
+# One device key's life
 
-The tutorial series describes the device-key lifecycle as the actual product:
-a key is generated, provisioned, operated, rotated, and revoked. This document
-maps every stage onto two things you can run directly:
+Run `python3 examples/collar_lifecycle.py` with `cryptography` installed.
+The article embeds this same source.
 
-1. `examples/collar_lifecycle.py` - the whole lifecycle as one script, no card
-   required. The card side is a stub that computes byte-for-byte what the
-   applet computes (AES-CMAC over the same bytes).
-2. The real transcripts in `transcripts/` - the same ceremony on hardware.
-
-## The map
-
-| Stage | Concrete operation | Where in this repo |
+| Stage | Device-key operation | Evidence |
 |---|---|---|
-| Generate | Session keys derived per-session from the master keyset and the card's challenge | `transcripts/03_j3r150_manual_scp02_success.txt` |
-| Provision (card keys) | PUT KEY: replace the ISD keyset (batch keys to factory keys, version FF to 01, three KCV confirmations) | `transcripts/04_j3r150_putkey_batch_to_factory.txt` |
-| Provision (applet keys) | PERSONALIZE (INS 0x40): device key injected under the transport key, CMAC-verified, stored in EEPROM. One-shot by design | `transcripts/11_j3r150_cmac_verify_session.txt` |
-| Operate | EXT AUTH every session: the card verifies a cryptogram over both challenges | `transcripts/03_j3r150_manual_scp02_success.txt` |
-| Rotate | PUT KEY under a new version number; the old keyset stays valid until the card switches. Applet-level: INS_ROTATE below | `transcripts/04_j3r150_putkey_batch_to_factory.txt` |
-| Revoke | DELETE removes the applet and its persistent state - keys, counters, flags | `transcripts/08_j3r150_load_success_install_locked.txt` |
+| Generate | Host generates 16 random bytes | Python example |
+| Personalize | INS 40: key + CMAC under the applet transport key; one-shot | Transcripts 39/41 |
+| Authenticate | INS 32: CMAC(deviceKey, 01 || challenge) | Transcript 41 |
+| Rotate | INS 42: newKey + CMAC(oldKey, 02 || newKey) | Transcript 41 |
+| Revoke | Backend rejects the device; the card can still compute tags | Python example |
 
-## The script
+ISD management keys are separate. SCP02 derives session keys from them;
+EXT AUTH authenticates a management session, PUT KEY changes the management
+keyset, and DELETE removes installed content. DELETE is not backend revocation.
 
-    /usr/bin/python3 examples/collar_lifecycle.py
+## What the example checks
 
-Expected output - the biography of one key:
+- Personalization is one-shot and validates the packet length and CMAC.
+- Ordinary MAC tags cannot authorize ROTATE, including under `python3 -O`.
+  Security checks use exceptions rather than assertions.
+- The backend accepts only its outstanding challenge and consumes it on success.
+  Issuing another challenge invalidates the previous one.
+- Rotation leaves the old backend key active until the card returns a valid
+  MAC under the proposed new key.
+- Revocation rejects even a valid response to an earlier challenge.
 
-    1) personalized at production, enrolled on backend
-    2) auth: accepted
-    2) auth: accepted
-    3) rotated: card and backend both hold fresh keys
-    4) auth with fresh key: accepted
-    5) after revocation: REJECTED: unknown or revoked device
-       the card itself still MACs fine - it is healthy, just orphaned
+Expected output:
 
-Read the last two lines twice. Revocation is not an instruction you send to a
-stolen card - a stolen card would ignore it anyway. Revocation is a fact the
-backend knows and the card never learns. The chip keeps computing perfect MACs
-with a perfectly good key; the server simply stops caring.
-
-## The applet-side rotation (INS 0x42)
-
-The listing in `applet/` enrolls the key via INS_PERSO (0x40). Rotation is one
-more instruction that refuses to do anything useful without proof of the
-current key. Append to the applet:
-
-```java
-private static final byte INS_ROTATE = 0x42;
-
-// in process(), one more case:
-case INS_ROTATE: {
-    if (!personalized) ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-    apdu.setIncomingAndReceive();
-    // expects: 16-byte new key || its full 16-byte CMAC under the *current* device key
-    mac.init(deviceKey, Signature.MODE_VERIFY);
-    if (!mac.verify(c, ISO7816.OFFSET_CDATA, (short) 16,
-                    c, (short) (ISO7816.OFFSET_CDATA + 16), (short) 16))
-        ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
-    deviceKey.setKey(c, ISO7816.OFFSET_CDATA);
-    mac.init(deviceKey, Signature.MODE_SIGN);   // re-bind the engine to the new value
-    return;
-}
+```text
+1) personalized at production, enrolled on backend
+2) auth: accepted (round 1)
+2) auth: accepted (round 2)
+3) forgery via plain MAC rejected (domain separation holds)
+   rotated: card and backend both hold fresh keys
+4) auth with fresh key: accepted
+5) after revocation: REJECTED: unknown or revoked device
+   the card itself still MACs fine - it is healthy, just orphaned
 ```
 
-Notice what it does not contain: any way to read the old key out, and any way
-to install a new one without proving knowledge of the current one.
+## Scope
 
-## Production note
+CardStub models command behavior, not secret isolation: Python attributes are
+readable. The key-plus-MAC packets are plaintext with integrity, not encrypted
+wrapping. Both card and verifier hold the shared device key.
 
-The bench scripts use the factory transport key from the documentation - fine
-for a tutorial, fatal in a product. A production line derives a per-device
-transport key on a hardware security module, injects it during applet
-installation, and the personalization station knows exactly one device's
-secret at exactly one moment, under split-knowledge controls: no single
-person, and no single machine, ever holds enough to clone a device.
+The backend is in memory, with one outstanding challenge and one pending
+rotation per device. Durable storage, crash recovery, rotation retry after a
+lost response, concurrency, and challenge expiry need an explicit production
+design. These are not claimed as hardware tests.
 
-The series this kit accompanies starts with
-[Securing a Smart Dog Collar (HackerNoon)](https://hackernoon.com/securing-a-smart-dog-collar-secure-elements-key-lifecycles-and-why-tls-isnt-enough-on-5-microamp).
+The canonical applet is `sim/CollarMACRotate.java`; the earlier
+`applet/CollarMAC.java` has a different, unprefixed MAC protocol.
+Transcript 39 predates domain separation; transcript 41 covers the current
+domains and rotation. Use a matching host calculation and CAP.
+
+A holder of a compromised current device key can authorize rotation too.
+Recovering ownership then requires a separate trusted provisioning procedure.
+Public factory test keys are for the bench only.

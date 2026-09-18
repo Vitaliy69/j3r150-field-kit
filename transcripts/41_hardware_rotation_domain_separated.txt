@@ -1,0 +1,72 @@
+HARDWARE KEY ROTATION, domain-separated build
+
+Build provenance:
+  source: sim/CollarMACRotate.java (CTX_MAC=0x01 / CTX_ROTATE=0x02,
+          receiveAll + strict lengths, MODE_SIGN restore on failure)
+  build:  JDK 21.0.12, javac --release 8, class major patched 52->51
+          (JC 3.0.5 converter limit; see article Gotcha 1),
+          converter: java -cp sdk/jc305u2/lib/tools.jar
+          com.sun.javacard.converter.Main -config CollarMACRotate.opt
+  CAP SHA-256: 95DBD2FE7D5B0D174FD09813075DBBD3FBF53F039EAC68C76AF215457710268F
+  jCardSim harness: transcripts/40_rotate_domain_separation_harness.txt (18/18)
+
+Install (card #3, batch FF, gp_lite full0c):
+  DELETE instance/package    -> 9000
+  INSTALL for load           -> 9000
+  LOAD x7 (9940-byte CAP)    -> 9000
+  INSTALL combined           -> 9000   *** INSTALLED AND SELECTABLE ***
+
+Session A (javax.smartcardio, no reseat between commands):
+  SELECT                    -> SW 9000
+  MAC before perso          -> SW 6985
+  PERSONALIZE (K1 wrap)     -> SW 9000
+  MAC(CH) under K1          -> SW 9000  B547D898956AF64ED4DCEA32987426C1
+                              (host CMAC(K1, 01||CH) - MATCH; note: differs
+                              from the old non-domain tag 7E52... - expected)
+  FORGE rotate: K2 || CMAC(K1, 01||K2)   <- a tag obtainable via the plain
+                              MAC command under the OLD build
+                            -> SW 6982   *** FORGERY REJECTED ***
+  MAC(CH) after failed rotate (same session, no reselect)
+                            -> SW 9000  B547D898956AF64ED4DCEA32987426C1
+                              *** stale-engine fix proven on hardware ***
+  ROTATE: K2 || CMAC(K1, 02||K2)
+                            -> SW 9000   *** HARDWARE KEY ROTATION ***
+  MAC(CH) under K2          -> SW 9000  D2011C73250BF215D3F5F0EB005C38A1
+                              (host CMAC(K2, 01||CH) - MATCH)
+
+Session B (after card reseat / power cycle):
+  SELECT                    -> SW 9000
+  MAC(CH)                   -> SW 9000  D2011C73250BF215D3F5F0EB005C38A1
+                              (K2 survived the power cycle - EEPROM)
+  ROTATE with the OLD K1-tag (replay of the previous authorization)
+                            -> SW 6982   (rejected - tag no longer valid)
+  MAC(CH)                   -> SW 9000  D2011C73250BF215D3F5F0EB005C38A1
+                              (engine healthy after the rejection)
+
+Session B (continued) - boundary message lengths under K2:
+  MAC len 1  (01)                       -> 51FD507F4797325819B19A3F40C96A4B
+  MAC len 16 (0102..10)                 -> 0A219C3AC3D7CCA2DF1765AADE17D2EA
+  MAC len 32 (0102..20)                 -> E6A8F0B8720A4371113F9768E50A0D42
+  host CMAC(K2, 01||msg) for each:      MATCH / MATCH / MATCH
+
+WHAT IS NOW PROVEN ON HARDWARE: personalization, USE of the device key,
+boundary-length behavior, the cross-domain forgery rejection, stale-engine
+recovery, key rotation under its own signature, key persistence across power
+cycles, and replay rejection of a superseded rotation tag.
+
+
+REPRODUCIBILITY ADDENDUM (per review): the CAP tested above (95DBD2FE...) was
+built in a directory that still held a stale CollarMAC.class from an earlier
+build, so the package carried one unused extra class. A clean rebuild from
+sim/CollarMACRotate.java alone (bounds-check revision: incoming length
+validated after the first receive, before further receiveBytes; P1/P2 checks)
+converts with 0 errors and 18/18 harness passes:
+  CLEAN CAP SHA-256: 6E41EC8C06B85AFB31A9CA5C6469FFEB474D38BB281DE6E976843B38403CFF35
+The hardware results above were obtained with the dirty build; the clean
+build differs only by the removed unused class and the bounds-check revision.
+
+CLEAN-BUILD HARDWARE VERIFICATION: reinstalled from the clean
+CAP (6E41EC8C...): delinst 9000, delete 9000, load+install 9000, then via
+javax.smartcardio: MAC-before-perso 6985, PERSO 9000, MAC = B547D898... (host
+match), ROTATE 9000, MAC = D2011C73... (host match). The reproducible build
+runs the identical protocol end to end.

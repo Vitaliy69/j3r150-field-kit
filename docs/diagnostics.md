@@ -1,63 +1,51 @@
-# Diagnostics: card vs reader vs driver
+# Diagnostics: separate the client, reader, and card
 
-Question: which layer of "hostility" is the card's firmware, and which is the
-reader (Generic EMV Smartcard Reader) or the macOS PCSC driver?
+The malformed INSTALL and broken Python PC/SC binding were client bugs.
+The later reconnect failure is a separate, reproducible observation. It
+does not prove that the card or seller is at fault.
 
-## Solidly attributed to the card
+## Independent checks on 2026-09-18
 
-- **The static card challenge.** Across five sessions with five different host
-  challenges the card produced three distinct "random" challenges, two of them
-  twice. The challenge is generated on-card; the reader only carries bytes.
-  A repeating challenge is a firmware/spec violation.
-- **6985 for oversized GET RESPONSE** and **6112/611C for promised lengths** -
-  on-card state machine semantics, consistent across our tooling.
-- **The case-3/case-4 split reached the card.** Through the same reader and the
-  same pipe: `84 82 01 00 10 <16>` answered 6982 (live crypto check), while the
-  same command plus a trailing `00` answered 6D00. The reader passed both
-  formats; the card distinguished them. The Le-sensitivity is the card's.
+Setup: macOS 26.7, Generic EMV Smartcard Reader (USB 058F:9540), T=0.
+The reader was connected through an Apple USB hub.
 
-## Could still be reader/driver
+- GPPro v25.10.20 with Homebrew Java 21.0.12 returned `6D00` for case-4
+  EXTERNAL AUTHENTICATE through javax.smartcardio. This reproduced the failure
+  without the Python transport. It does not identify the rejecting layer or
+  establish failure for every GPPro release.
+- Native C programs compiled against Apple's PC/SC headers reproduced a
+  failed reconnect using only SELECT ISD and GET RESPONSE. No authentication,
+  key changes, applet installation, or rotation was needed.
+- After disconnect with LEAVE_CARD, reconnect failed with `0x80100066`.
+- Holding the same handle open for 120 seconds without APDUs allowed another
+  successful SELECT. After closing it, an independent connect failed 14 seconds later.
+- Disconnect with UNPOWER_CARD did not help: reconnect failed after 10.8 seconds.
+- The USB reader kept the same IORegistry identity. PC/SC still reported PRESENT
+  and a cached ATR; neither proves that a new connection will work.
 
-- **Response truncation** (26 of 28 bytes of INIT UPDATE): could be the CCID
-  reader buffer, the driver, or the card. Discriminator: same card in a second
-  reader (or NFC contactless from a phone - the J3R150 is dual-interface).
-- **Post-session wedges**: could be the reader keeping the card powered in a
-  stuck protocol state rather than the card itself.
+Exact APDUs and observation times: [transcript 42](../transcripts/42_reviewer_gppro_and_reconnect.txt).
 
-## Probes to run (one reseat per probe, SELECT-only ones are always safe)
+## Practical workaround and limits
 
-1. **JCOP fusion state** (answers the "unfused?" question directly):
+Reseat the card before a new CLI session on a setup that exhibits this failure.
+For a multi-operation diagnostic, retain one connection until the sequence ends.
+The two-minute HOLD result supports that workaround for the tested interval;
+it is not a permanent fix. Periodic keepalive APDUs were not needed in that test.
 
-       00 A4 04 00 08 A0 00 00 01 67 41 30 00 FF
+The kit's four quick-start commands are separate processes. They do not share
+a handle. Closing resources correctly does not, by itself, cure this reconnect
+failure. After a PC/SC error, stop; do not continue an old secure-channel MAC chain.
 
-   IDENTIFY applet. SW 9000: byte at offset 14 of the data - 00h = unfused,
-   01h = fused/configured. SW 6A82: no IDENTIFY applet (expected on JCOP4 -
-   the mechanism is documented for JCOP21-era chips; on JCOP4 its absence is
-   uninformative).
+A second reader, another OS, or a controlled protocol comparison is needed to
+separate card activation, reader firmware, and the macOS driver. We do not have
+that comparison. The measured times are probe times, not a discovered idle timer.
 
-2. **Transport key as AID** (legacy init path, JCOP21-era):
+## Other limits
 
-       00 A4 04 00 10 C2 38 E4 49 F7 25 B1 51 0E AA 69 95 50 CA BA 16
-
-   9000 = the legacy init path exists (do NOT run the key-write/fuse commands
-   without a plan). 6A82 = path absent.
-
-3. **Force T=1**: connect with protocol mask 0x02 only. If the card supports
-   T=1, the case-4 EXT AUTH may pass naturally (T=1 carries Le in-band) - this
-   discriminates "card rejects Le" from "T=0 framing quirk".
-
-4. **Cross-reader**: same card in a second reader model (or via NFC from an
-   Android phone with a GP-capable app). If the 6D00-on-Le follows the card to
-   another reader, it is the card. If it disappears, it was the pipe.
-
-5. **CPLC cross-check**: run the CPLC read on BOTH cards of the batch and
-   compare ICFabricator/ICType/serials. Ours: ICFabricator 0x4790, ICType D321.
-   If the two cards differ in CPLC, the "batch" assumption is wrong too.
-
-## What we still do not know
-
-- The real Java Card OS version: 2.2.2, 3.0.4 or 3.0.5 (ATR is spoofable;
-  CPLC does not carry it; only building and installing an applet answers this (the converter version tells you the API level the card accepts)).
-- The fusion state (probe: JCOP IDENTIFY).
-- The attribution of the 6D00-on-Le (card vs reader/driver: the T=1 and cross-reader probes).
-- The source of response truncation (probe with second reader).
+- Registry contents do not establish fuse state or payment personalization.
+- Loading a CAP built against an SDK establishes compatibility with the APIs
+  exercised by that applet, not the full OS version.
+- Historical repeated card challenges need a clean re-test with sequence
+  counters and successful session boundaries recorded. SCP02 permits a
+  pseudorandom challenge; repetitions during failed handshakes alone do not
+  prove a broken random generator.

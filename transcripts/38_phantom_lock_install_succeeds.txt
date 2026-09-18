@@ -1,0 +1,58 @@
+THE PIVOT SESSION: the "lock" was our own INSTALL form.
+
+Background: an independent review pointed out that in INSTALL [for install]
+the THIRD AID field is the APPLICATION INSTANCE AID slot (not the Security
+Domain), and the data field must end with an Install Token length byte.
+Our historical 31-byte form put the ISD AID (A000000151000000) into the
+instance slot and omitted the token length.
+
+Variant sweep (card #3, batch KVN FF, one form per session):
+
+  2.2.1 canonical (raw privileges byte), instance-override   -> SW 6A80
+  2.2.1 canonical, default instance                           -> SW 6A80
+  2.3 full (SD AID + volatile/non-volatile fields)            -> SW 6A80
+  LV-priv dialect, instance F000000001DEAD02, token 00 (P1=04) -> SW 9000  <<<
+  LV-priv dialect, instance F000000001DEAD01, token 00 (P1=04) -> SW 9000  <<<
+  original form + token-len appended (ISD in instance slot)   -> SW 6985
+
+CORRECTION (per review): the working form below is the STANDARD GP 2.2.1
+encoding - Table 11-43 encodes Privileges as an LV field (Length of
+Privileges + Privileges), so '01 00' is canonical, not a card-specific
+dialect. The "raw privileges byte" variants tried earlier were the
+non-canonical ones (misidentified at first as 'canonical 2.2.1').
+
+The form that installs: <L><pkg AID> <L><module AID> <L><instance AID>
+<LV privileges (01 00)> <LV install params (02 C9 00)> <token len (00)>.
+Putting the ISD AID into the instance slot is refused with 6985 - an honest
+AID-conflict answer, not a firmware lock.
+
+CAP loaded in this session: build/cap/collarmac/javacard/collarmac.cap
+CAP SHA-256: B7922373B27E6D673F838931AC94051F539DBEB36481E0204124D236491AAFB4
+
+FULL CYCLE, all 9000:
+
+  DELETE our package                     -> SW 9000
+  INSTALL for load                       -> SW 9000
+  LOAD block 1/4 (247B, last=00)         -> SW 9000
+  LOAD block 2/4 (247B, last=00)         -> SW 9000
+  LOAD block 3/4 (247B, last=00)         -> SW 9000
+  LOAD block 4/4 (86B, last=80)          -> SW 9000
+  INSTALL combined (LV-priv dialect)     -> SW 9000   *** INSTALLED AND SELECTABLE ***
+  DELETE instance DEAD01                 -> SW 9000   (instances delete cleanly too)
+  DELETE instance DEAD02                 -> SW 9000
+  DELETE our package                     -> SW 9000
+
+CONCLUSION OVERTURNED: the batch does NOT block applet installation.
+Every "lock" transcript (08, 12, 35, 36) is the same malformed command.
+
+OPEN MYSTERY: SELECT of the installed applet fails at the PC/SC layer
+(rc=0x80100016 = SCARD_E_NOT_TRANSACTED, not a timeout as first assumed;
+the all-zero buffer was the client reading a buffer it never validated -
+the host transport had: 16-byte SCARD_IO_REQUEST where the SDK defines 8
+(native saw cbPciLength=0), an 8th argument in SCardTransmit, and no rc
+checks. All fixed; the ISD answers normally right after the failure). Both instance variants (AID == module AID and AID != module
+AID). install() demonstrably completed (INSTALL 9000 -> constructor ran:
+buildKey, setKey, Signature.getInstance(ALG_AES_CMAC_128)). Candidates:
+CAP built for JC 3.0.5 vs this JCRE (a JC 2.2.2 build exists, untested);
+the combined make-selectable marking in the LV-priv dialect; reader
+flakiness. Application lifecycle (perso/MAC) not yet reached on hardware.

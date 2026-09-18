@@ -14,9 +14,12 @@ DEK (CDKdek) D3749ED4FF42FD58B39EEB562B017CD9
 2. GlobalPlatformPro discussion #382 (Feb 2025) documents the same card model from a marketplace, with three seller-supplied key values under the label "J3R150 TK". They failed for that buyer in every mode he tried.
 3. An Ozon review of the same card stream (Jul 2026) quotes the same three values and reports a successful key reset with them.
 
-## How they were verified without risk
+## How they were verified
 
-INITIALIZE UPDATE answers in the clear. The host derives session keys from the candidate base keys and checks the card's cryptogram before sending anything that could touch the card's try counter. Running `gp -ldv` with these base keys prints "Verified card cryptogram" - host-side mathematical proof that the card holds the same key material, at zero risk to the counter.
+The host checks the card cryptogram from INITIALIZE UPDATE before sending
+EXTERNAL AUTHENTICATE. A mismatch rejects the candidate keyset locally.
+The full channel-opening command still authenticates after a match; it is
+not an offline-only key checker. We did not measure this card's retry limit.
 
 ## Scope
 
