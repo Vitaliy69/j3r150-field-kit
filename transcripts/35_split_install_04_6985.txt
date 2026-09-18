@@ -1,0 +1,22 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INITIALIZE UPDATE #1                   -> SW 9000
+EXTERNAL AUTHENTICATE (C-MAC level)    -> SW 9000
+-- secure channel open --
+
+INSTALL for load                       -> SW 9000
+LOAD block 1/4 (247B, last=00)         -> SW 9000
+LOAD block 2/4 (247B, last=00)         -> SW 9000
+LOAD block 3/4 (247B, last=00)         -> SW 9000
+LOAD block 4/4 (86B, last=80)          -> SW 9000
+INSTALL [for install] only (P1=04)     -> SW 6985
+INSTALL [for make selectable]          -> skipped (install did not pass)
+
+VERDICT: with the combined P1=0C form factored out, INSTALL [for install]
+ALONE returns 6985. The block sits on the installation step itself, not on
+make-selectable. Combined with transcript 14 (no token key on card) and the
+keyset-swap experiment (transcript 12), every cryptographic explanation is
+eliminated: the 6985 is a card-configuration (OPEN/vendor policy) restriction
+of this J3R150 batch - loading is permitted, installing new applications is
+not, even for the authenticated ISD provider under Authorized Management.

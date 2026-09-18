@@ -91,7 +91,7 @@ def derive(base, usage, x2):
     return cbc3(base, bytes([0x01, usage]) + x2 + b'\x00'*12)
 
 # ---- SCP02 handshake (from open_channel.py) ----
-def open_channel():
+def open_channel(level=0x01):   # 0x01 = C-MAC, 0x03 = C-MAC + C-DECRYPTION
     isd = bytes.fromhex("A000000151000000")
     sw, _ = transmit([0x00, 0xA4, 0x04, 0x00, len(isd)] + list(isd) + [0x00], "SELECT ISD")
     if sw != "9000": sys.exit("ISD not responding - reseat the card")
@@ -105,10 +105,11 @@ def open_channel():
     x2 = resp[12:14]; cc = resp[12:20]
     s_enc = derive(KENC, 0x82, x2); s_mac = derive(KMAC, 0x01, x2)
     host_crypto = mac_3des(s_enc, cc + hc)
-    mac_input = bytes([0x84, 0x82, 0x01, 0x00, 0x10]) + host_crypto
+    mac_input = bytes([0x84, 0x82, level, 0x00, 0x10]) + host_crypto
     cmac = mac_des_3des(s_mac, mac_input)
-    ext = [0x84, 0x82, 0x01, 0x00, 0x10] + list(host_crypto) + list(cmac)
-    sw, _ = transmit(ext, "EXTERNAL AUTHENTICATE (C-MAC level)")
+    ext = [0x84, 0x82, level, 0x00, 0x10] + list(host_crypto) + list(cmac)
+    lbl = "EXTERNAL AUTHENTICATE (C-MAC+C-DECRYPT)" if level == 0x03 else "EXTERNAL AUTHENTICATE (C-MAC level)"
+    sw, _ = transmit(ext, lbl)
     if sw != "9000": sys.exit("EXT AUTH rejected - session dead, reseat")
     print("-- secure channel open --\n")
     return s_mac, cmac   # session MAC key + first ICV
@@ -254,6 +255,99 @@ if stage == "setstatus":
     state["icv"] = icv0
     sw, _ = sx(0xF0, 0x80, target, b"", f"SET STATUS ISD -> {target:02X}")
     print(f"SET STATUS: {sw}")
+
+elif stage == "open03":
+    # Disambiguation probe: C-DECRYPTION-level channel + a NO-DATA command
+    # (GET STATUS). If 9000 -> level-03 MAC mechanics fine, 6982 is specific
+    # to encrypted-data INSTALL. If 6982 -> level-03 sessions break MAC.
+    s_mac, icv0 = open_channel(level=0x03)
+    sx, state = make_secure_tx(s_mac)
+    state["icv"] = icv0
+    sw, resp = sx(0xF2, 0x40, 0x02, b"", "GET STATUS apps (level 03, no data)")
+    print(f"GET STATUS under C-DECRYPTION channel: SW {sw}")
+
+elif stage == "install03":
+    # Lever: C-MAC + C-DECRYPTION security level (EXTERNAL AUTHENTICATE P1=03)
+    # instead of plain C-MAC (0x01). Some firmwares demand encrypted INSTALL
+    # bodies. ONE command: INSTALL [for install] with the data field
+    # encrypted 3DES-CBC/KDEK (SCP02 wrap: last-8-bytes prefix + rest).
+    # Requires the package already in the registry (run load04 first).
+    from cryptography.hazmat.primitives.ciphers import Cipher as _C, algorithms as _A, modes as _M
+    dek_hex = _os.environ.get("GP_KDEK", _os.environ.get("GP_KENC", _enc))
+    KDEK = bytes.fromhex(dek_hex)
+    print(f"   DEK = GP_KDEK/GP_KENC default ({dek_hex[:8]}...)")
+    s_mac, icv0 = open_channel(level=0x03)
+    sx, state = make_secure_tx(s_mac)
+    state["icv"] = icv0
+    data = bytes.fromhex("07F000000001DEAD08F000000001DEAD0108A000000151000000010002C900")
+    pad = data + b"\x80" + b"\x00" * ((8 - len(data) % 8) % 8)
+    c = _C(_A.TripleDES(KDEK), _M.CBC(b"\x00" * 8))
+    ct = c.encryptor().update(pad)
+    wrap = _os.environ.get("GP_WRAP", "last")
+    if wrap == "last":    wrapped = ct[-8:] + ct[:-8]
+    elif wrap == "first": wrapped = ct[8:] + ct[:8]
+    else:                 wrapped = ct
+    sw, _ = sx(0xE6, 0x04, 0x00, wrapped, "INSTALL P1=04 (C-DECRYPTION level)")
+    print(f"\n>>> INSTALL under C-DECRYPTION: SW {sw}")
+
+elif stage == "load04":
+    # Full flow, but with the SPLIT final step: INSTALL [for install] (P1=04)
+    # and, only on 9000, INSTALL [for make selectable] (P1=08). Distinguishes
+    # "installation itself blocked" from "make-selectable blocked".
+    s_mac, icv0 = open_channel()
+    sx, state = make_secure_tx(s_mac)
+    state["icv"] = icv0
+    # NB: a FAILED DELETE (6A88) still advances the card's C-MAC chain on this
+    # batch, desyncing the next command (6982). The package is known absent,
+    # so skip DELETE; retry the whole session if 6A80 (AID collision) appears.
+    sw, _ = install_for_load(sx)
+    if sw != "9000": sys.exit("INSTALL for load failed")
+    load_blocks(sx, cap_stream(CAP_PATH))
+    data = bytes.fromhex("07F000000001DEAD08F000000001DEAD0108A000000151000000010002C900")
+    sw, _ = sx(0xE6, 0x04, 0x00, data, "INSTALL [for install] only (P1=04)")
+    print(f"\n>>> INSTALL for install: SW {sw}")
+    if sw == "9000":
+        msdata = bytes.fromhex("08F000000001DEAD01")
+        sw2, _ = sx(0xE6, 0x08, 0x00, msdata, "INSTALL [for make selectable] (P1=08)")
+        print(f">>> INSTALL make selectable: SW {sw2}")
+    else:
+        print(">>> make-selectable skipped (install did not pass)")
+
+elif stage == "keyinfo":
+    # GET DATA 'Key Information' (tag 00E0) under the secure channel.
+    # Reveals whether the ISD carries an RSA/ECC token-verification key
+    # (Delegated Management) in addition to the SCP02 DES keyset.
+    s_mac, icv0 = open_channel()
+    sx, state = make_secure_tx(s_mac)
+    state["icv"] = icv0
+    sw, resp = sx(0xCA, 0x00, 0xE0, b"", "GET DATA 00E0 (key info)")
+    print(f"GET DATA: SW {sw}")
+    if resp:
+        print("RAW:", resp.hex().upper())
+        i = 0
+        while i < len(resp):
+            if resp[i] == 0xE0:
+                ln = resp[i+1]; blob = resp[i+2:i+2+ln]; i += 2 + ln
+                j = 0
+                while j < len(blob):
+                    kid, kvn, ktype, klen = blob[j], blob[j+1], blob[j+2], blob[j+3]
+                    types = {0x80:"DES3", 0x88:"AES", 0x81:"RSA_PUBLIC", 0x82:"RSA_PRIVATE", 0x8A:"ECC"}
+                    usage = {1:"ENC/MAC/DEK", 2:"ENC", 4:"MAC", 8:"DEK", 0x44:"token+receipt?"}
+                    print(f"  key {kid:02X} v{kvn:02X} type={types.get(ktype, hex(ktype))} len={klen}")
+                    j += 4 + klen
+            else:
+                i += 1
+
+elif stage == "install04":
+    # Split INSTALL [for install] (P1=0x04) - same 31-byte data field as the
+    # combined form. Distinguishes "installation blocked" from
+    # "make-selectable blocked".
+    s_mac, icv0 = open_channel()
+    sx, state = make_secure_tx(s_mac)
+    state["icv"] = icv0
+    data = bytes.fromhex("07F000000001DEAD08F000000001DEAD0108A000000151000000010002C900")
+    sw, _ = sx(0xE6, 0x04, 0x00, data, "INSTALL [for install] only")
+    print(f"INSTALL for install: SW {sw}")
 
 elif stage == "lockcheck":
     # One command, the whole story: the INSTALL [for install] form from

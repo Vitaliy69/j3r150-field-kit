@@ -1,0 +1,15 @@
+Reader: Generic EMV Smartcard Reader
+SCardConnect: 0x0 | proto: T=0
+SELECT ISD                             -> SW 9000
+INITIALIZE UPDATE #1                   -> SW 9000
+EXTERNAL AUTHENTICATE (C-MAC level)    -> SW 9000
+-- secure channel open --
+
+GET DATA 00E0 (key info)               -> SW 9000
+   RAW: E012 C00401FF8010 C00402FF8010 C00403FF
+   decode: key1(ENC) KVN=FF 3DES(0x80) 16B | key2(MAC) KVN=FF 3DES 16B | key3(DEK) KVN=FF 3DES 16B
+
+VERDICT: the ISD carries ONLY the three SCP02 3DES keys (batch KVN=FF).
+No RSA/ECC token-verification key exists on this Security Domain.
+The Delegated Management / Install Token mechanism is therefore not
+personalized on this card: there is nothing on-card to verify a token WITH.

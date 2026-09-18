@@ -1,0 +1,29 @@
+Card #1 (factory-derived keyset, INIT UPDATE reports key ID 01 KVN 02),
+session chain on 18.09 after registry cleanup:
+
+DELETE our package                     -> SW 9000   (debris from earlier experiments)
+INSTALL for load                       -> SW 9000
+LOAD block 1/4                         -> SW 9000
+LOAD block 2/4                         -> SW 9000
+LOAD block 3/4                         -> SW 9000
+LOAD block 4/4                         -> SW 9000
+INSTALL [for install] only (P1=04)     -> SW 6985
+
+SET STATUS ISD -> 0F (SECURED)         -> SW 6985   <<< refused ON THIS CARD (which lives on
+                                                          the factory/v02 keyset after PUT KEY
+                                                          experiments). NB: transcript 13 (Sep 14)
+                                                          shows 0F REACHED with 9000 on the original
+                                                          batch-keyed card - and INSTALL still 6985
+                                                          in state 0F. The Sep-14 walk is the primary
+                                                          lifecycle evidence; today's refusal is a
+                                                          card-history nuance, not the rule.
+
+CROSS-CARD SUMMARY (same batch, two different SCP keysets):
+  card #3, batch KVN FF : LOAD x4 9000 -> INSTALL P1=04 6985   (transcript 35)
+  card #1, KVN 02       : LOAD x4 9000 -> INSTALL P1=04 6985   (this file)
+  card #1 lifecycle     : 01->07 allowed (transcript 13), 07->0F REFUSED (6985)
+
+CONCLUSION ADDENDUM: the installation block is keyset-independent, and the
+INITIALIZED->SECURED issuer transition is not reachable from the host side.
+The lifecycle-gate hypothesis (install gated on SECURED) cannot be reached
+for testing - the gate to the gate is closed. Vendor configuration territory.

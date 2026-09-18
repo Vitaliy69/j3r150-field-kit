@@ -71,8 +71,36 @@ On an unlocked card every stage answers `9000`. On the locked J3R150 batch:
 INSTALL for load                       -> SW 9000
 LOAD 1/4                               -> SW 9000
 LOAD 2/4 .. 4/4                        -> SW 9000
-INSTALL for install                    -> SW 6985   <-- firmware lock (see "What worked")
+INSTALL for install                    -> SW 6985   <-- installation blocked by card/batch config (see Diagnostics)
 ```
+
+### Diagnostics: what the 6985 is (and is not)
+
+Evidence matrix (transcripts 34-37, three cards of the batch):
+
+```
+SCP02 authentication (two keysets: batch FF, factory 02)   confirmed
+CAP LOAD (4 blocks, 9000 x4)                               confirmed
+DAP verification                                            excluded (LOAD passes)
+Delegated Management / Install Token                        excluded (no DM privilege,
+                                                             no token key in 00E0 inventory)
+make-selectable path                                        excluded (INSTALL P1=04 alone -> 6985)
+lifecycle gate (install needs SECURED)                       tested and refuted: the card was
+                                                             walked OP_READY -> INITIALIZED ->
+                                                             SECURED (transcript 13); INSTALL stays
+                                                             6985 in all three states
+encrypted-INSTALL path (C-DECRYPTION, EXT AUTH P1=03)        rejected: 6982 with all three advertised
+                                                             key values as DEK (including the one
+                                                             printed in the seller's own listing)
+                                                             under every wrap variant
+```
+
+Proven: installation is blocked by card/batch configuration, not by keys,
+DAP, tokens, or the applet itself - and the block reaches beyond INSTALL
+into lifecycle transitions. Remaining hypothesis: an undocumented vendor
+unlock procedure or an undelivered KDEK; either requires seller assistance.
+New stages: `keyinfo` (GET DATA 00E0), `load04` (split INSTALL),
+`install03`/`open03` (C-DECRYPTION level, `GP_KDEK`/`GP_WRAP` env).
 
 ### 5. Your own card's keys
 
@@ -138,7 +166,7 @@ Every failure mode we hit, in one table. Column "Gotcha" refers to the numbered 
 | `63Cx` | Auth failed; x tries left | STOP. Check keys, never brute-force | try counter |
 | `644F` | Memory error during LOAD | Stream too big or wrong format - check Descriptor exclusion and dialect | 3, 9 |
 | `6982` | Security status not satisfied | MAC/ICV chain wrong - check ICV encryption | 6 |
-| `6985` | Conditions not satisfied | On INSTALL: firmware lock (unfixable). On MAC before personalization: by design | 16 |
+| `6985` | Conditions not satisfied | On INSTALL: installation policy restriction of this batch (see Diagnostics). On SET STATUS to SECURED: issuer-only transition. On MAC before personalization: by design | 16, 36 |
 | `6A80` | Bad parameters in command data | Dialect mismatch - try the other INSTALL/LOAD form | 7, 8, 9 |
 | `6A82` | Applet/file not found | Wrong AID - package AID vs applet AID (last byte) | - |
 | `6A86` | P1/P2 invalid | PUT KEY needs P2=0x81 | 11 |
@@ -166,6 +194,10 @@ Numbered in rough story order: J3R150 sessions (01-14), Mikron sessions (15-33).
 | `11_j3r150_cmac_verify_session.txt` | CMAC verification session |
 | `12_j3r150_card2_batch_lock_confirmed.txt` | Second card, same batch: lock is innate |
 | `13_j3r150_setstatus_lifecycle_matrix.txt` | SET STATUS: OP_READY -> INITIALIZED -> SECURED walk |
+| `34_keyinfo_three_des_only.txt` | GET DATA 00E0: ISD carries ONLY the three SCP02 3DES keys - no token-verification key exists |
+| `35_split_install_04_6985.txt` | Split INSTALL: P1=04 alone -> 6985 (block is on installation, not make-selectable) |
+| `36_card1_factory_keyset_lock.txt` | Same 6985 under a different keyset (factory v02); SET STATUS -> SECURED itself refused |
+| `37_cdecryption_level_probe.txt` | C-DECRYPTION level accepted; encrypted INSTALL 6982 - true KDEK never provided |
 | `14_hypotheses_log.txt` | The hypotheses ledger: what we tried and ruled out |
 | `15_mikron_first_probe.txt` | First contact with the Mikron (proto negotiation) |
 | `16_mikron_probe_raw_reader.txt` | Raw-reader probe |
